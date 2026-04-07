@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>DayBay Daily</title>
+  <style>
+    /* ─── Reset & Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0c10;
+      --bg2: #111318;
+      --bg3: #1a1d24;
+      --border: #252830;
+      --accent: #6c8fff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --text: #e8eaf0;
+      --text2: #8b90a0;
+      --text3: #555a6a;
+      --danger: #f87171;
+      --warn: #fbbf24;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { cursor: pointer; font-family: inherit; }
+    img { max-width: 100%; }
+
+    /* ─── Layout ─── */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ─── Header ─── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,12,16,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+    }
+    .header-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px; gap: 12px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.1rem; letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .header-date { color: var(--text2); font-size: 0.85rem; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text3); transition: background 0.3s;
+    }
+    .status-dot.online { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+
+    /* ─── Tabs ─── */
+    .tabs {
+      display: flex; gap: 4px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px; overflow-x: auto;
+      scrollbar-width: none; background: var(--bg);
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      padding: 12px 16px; font-size: 0.85rem; font-weight: 500;
+      color: var(--text2); border: none; background: none;
+      border-bottom: 2px solid transparent; white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s; cursor: pointer;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ─── Main ─── */
+    main {
+      flex: 1; max-width: 1200px; margin: 0 auto;
+      padding: 24px 20px; width: 100%;
+    }
+
+    /* ─── Panels ─── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ─── Grid ─── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ─── Cards ─── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #353840; }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; gap: 8px;
+    }
+    .card-title {
+      font-size: 0.8rem; font-weight: 600; letter-spacing: 0.5px;
+      text-transform: uppercase; color: var(--text2);
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* ─── Audio Player ─── */
+    .audio-card {
+      background: linear-gradient(135deg, rgba(108,143,255,0.15), rgba(167,139,250,0.15));
+      border-color: rgba(108,143,255,0.3);
+      margin-bottom: 20px;
+    }
+    .audio-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 4px; }
+    .audio-subtitle { font-size: 0.85rem; color: var(--text2); margin-bottom: 20px; }
+    .audio-player {
+      background: var(--bg3); border-radius: var(--radius);
+      padding: 16px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .player-controls { display: flex; align-items: center; gap: 12px; }
+    .btn-play {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--accent); border: none; color: white;
+      font-size: 18px; display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s, opacity 0.2s; flex-shrink: 0;
+    }
+    .btn-play:hover { transform: scale(1.05); }
+    .btn-play:active { transform: scale(0.95); }
+    .btn-play:disabled { opacity: 0.5; cursor: not-allowed; }
+    .player-info { flex: 1; min-width: 0; }
+    .player-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player-time { font-size: 0.78rem; color: var(--text2); }
+    .progress-wrap { display: flex; align-items: center; gap: 10px; }
+    .progress-bar {
+      flex: 1; height: 4px; background: var(--bg); border-radius: 2px;
+      cursor: pointer; position: relative;
+    }
+    .progress-fill {
+      height: 100%; background: var(--accent); border-radius: 2px;
+      transition: width 0.1s; pointer-events: none;
+    }
+    .time-label { font-size: 0.75rem; color: var(--text2); white-space: nowrap; }
+    audio { display: none; }
+
+    /* ─── Generate Button ─── */
+    .btn-generate {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 20px; border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; color: white; font-weight: 600; font-size: 0.9rem;
+      transition: opacity 0.2s, transform 0.1s; white-space: nowrap;
+    }
+    .btn-generate:hover { opacity: 0.9; }
+    .btn-generate:active { transform: scale(0.98); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: var(--radius-sm);
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); font-size: 0.85rem; font-weight: 500;
+      transition: border-color 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); }
+
+    /* ─── News Cards ─── */
+    .news-category { margin-bottom: 28px; }
+    .category-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .category-title { font-size: 1rem; font-weight: 700; }
+    .news-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .news-item {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 14px;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .news-item:hover { border-color: #353840; transform: translateY(-1px); }
+    .news-source {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.4px;
+      text-transform: uppercase; color: var(--accent);
+      margin-bottom: 6px;
+    }
+    .news-headline {
+      font-size: 0.9rem; font-weight: 600; line-height: 1.4;
+      margin-bottom: 6px;
+    }
+    .news-headline a { color: var(--text); }
+    .news-headline a:hover { color: var(--accent); text-decoration: none; }
+    .news-summary { font-size: 0.8rem; color: var(--text2); line-height: 1.5; }
+    .news-time { font-size: 0.72rem; color: var(--text3); margin-top: 8px; }
+
+    /* ─── Summary Cards ─── */
+    .summary-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+    }
+    .summary-cat-title {
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text2); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .summary-text { font-size: 0.9rem; line-height: 1.7; color: var(--text); }
+
+    /* ─── Word Cards ─── */
+    .word-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .word-header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, rgba(52,211,153,0.12), rgba(108,143,255,0.12));
+      border-bottom: 1px solid var(--border);
+    }
+    .word-lang { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); }
+    .word-main { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; margin: 4px 0 2px; }
+    .word-phonetic { font-size: 0.85rem; color: var(--text2); font-style: italic; }
+    .word-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .word-row { display: flex; gap: 10px; }
+    .word-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text3); width: 70px; flex-shrink: 0; padding-top: 2px; }
+    .word-value { font-size: 0.88rem; color: var(--text); }
+    .word-example { background: var(--bg3); border-radius: var(--radius-sm); padding: 10px 14px; }
+    .word-example-en { font-size: 0.88rem; font-style: italic; margin-bottom: 4px; }
+    .word-example-pt { font-size: 0.82rem; color: var(--text2); }
+    .word-tip {
+      background: rgba(108,143,255,0.08); border: 1px solid rgba(108,143,255,0.2);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      font-size: 0.82rem; color: var(--text2);
+    }
+    .word-tip::before { content: "💡 "; }
+
+    /* ─── Calendar ─── */
+    .event-item {
+      display: flex; gap: 14px; padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .event-item:last-child { border-bottom: none; }
+    .event-time {
+      font-size: 0.78rem; font-weight: 700; color: var(--accent);
+      min-width: 44px; padding-top: 2px;
+    }
+    .event-info { flex: 1; }
+    .event-subject { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
+    .event-meta { font-size: 0.78rem; color: var(--text2); }
+    .event-online {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      background: rgba(52,211,153,0.15); color: var(--accent3);
+      font-size: 0.7rem; font-weight: 600; margin-left: 6px;
+    }
+    .task-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-check {
+      width: 18px; height: 18px; border-radius: 4px;
+      border: 2px solid var(--border); flex-shrink: 0; margin-top: 2px;
+    }
+    .task-high .task-check { border-color: var(--warn); }
+    .task-title { font-size: 0.88rem; font-weight: 500; }
+    .task-due { font-size: 0.75rem; color: var(--text3); margin-top: 2px; }
+    .task-list-name {
+      font-size: 0.7rem; color: var(--accent); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+
+    /* ─── History ─── */
+    .history-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); margin-bottom: 8px;
+      cursor: pointer; transition: border-color 0.2s;
+    }
+    .history-item:hover { border-color: var(--accent); }
+    .history-date { font-size: 0.78rem; color: var(--text2); min-width: 90px; }
+    .history-type {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; padding: 2px 8px; border-radius: 4px;
+    }
+    .type-morning { background: rgba(108,143,255,0.15); color: var(--accent); }
+    .type-quick { background: rgba(167,139,250,0.15); color: var(--accent2); }
+    .history-info { flex: 1; font-size: 0.88rem; font-weight: 500; }
+    .history-audio { color: var(--text3); font-size: 0.78rem; }
+
+    /* ─── Alerts / State ─── */
+    .alert {
+      padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 16px;
+      font-size: 0.88rem; display: flex; align-items: flex-start; gap: 10px;
+    }
+    .alert-info { background: rgba(108,143,255,0.12); border: 1px solid rgba(108,143,255,0.3); color: var(--text); }
+    .alert-warn { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); color: var(--text); }
+    .alert-success { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.3); color: var(--text); }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { text-align: center; padding: 48px 20px; color: var(--text2); font-size: 0.9rem; }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    /* ─── Setup Panel ─── */
+    .setup-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 16px;
+    }
+    .setup-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .setup-desc { font-size: 0.85rem; color: var(--text2); margin-bottom: 16px; }
+    .code-block {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 16px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82rem; color: var(--accent3); overflow-x: auto;
+      white-space: pre; margin: 8px 0;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;
+    }
+    .badge-ok { background: rgba(52,211,153,0.15); color: var(--accent3); }
+    .badge-missing { background: rgba(248,113,113,0.15); color: var(--danger); }
+    .badge-optional { background: rgba(251,191,36,0.12); color: var(--warn); }
+
+    /* ─── Floating Action ─── */
+    .fab {
+      position: fixed; bottom: 24px; right: 24px; z-index: 200;
+      width: 56px; height: 56px; border-radius: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; color: white; font-size: 22px;
+      box-shadow: 0 4px 20px rgba(108,143,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(108,143,255,0.5); }
+    .fab:active { transform: scale(0.96); }
+    @media (min-width: 769px) { .fab { display: none; } }
+
+    /* ─── Scrollbar ─── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ─── Loading skeleton ─── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite; border-radius: 6px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skeleton-line { height: 14px; margin-bottom: 8px; border-radius: 4px; }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 480px) {
+      header { padding: 0 14px; }
+      main { padding: 16px 14px; }
+      .audio-title { font-size: 1.1rem; }
+      .word-main { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">☀️</div>
+        <span>DayBay Daily</span>
+      </div>
+      <div class="header-date" id="headerDate"></div>
+      <div class="header-right">
+        <div class="status-dot" id="statusDot" title="Status do servidor"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-panel="today">📋 Hoje</button>
+    <button class="tab" data-panel="news">📰 Notícias</button>
+    <button class="tab" data-panel="words">📚 Idiomas</button>
+    <button class="tab" data-panel="calendar">📅 Agenda</button>
+    <button class="tab" data-panel="history">🗂️ Histórico</button>
+    <button class="tab" data-panel="setup">⚙️ Setup</button>
+  </nav>
+
+  <!-- Main -->
+  <main>
+
+    <!-- PAINEL: HOJE -->
+    <div class="panel active" id="panel-today">
+      <div id="todayContent">
+        <div class="card" style="margin-bottom:16px">
+          <div class="skeleton-line skeleton" style="width:60%"></div>
+          <div class="skeleton-line skeleton" style="width:40%"></div>
+          <div class="skeleton-line skeleton" style="width:80%; margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL: NOTÍCIAS -->
+    <div class="panel" id="panel-news">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <h2 style="font-size:1.1rem;font-weight:700">Notícias de Hoje</h2>
+        <button class="btn-secondary" onclick="loadLiveNews()">
+          🔄 Atualizar notícias
+        </button>
+      </div>
+      <div id="newsContent">
+        <div class="empty"><div class="empty-icon">📰</div>Carregando notícias...</div>
+      </div>
+    </div>
+
+    <!-- PAINEL: IDIOMAS -->
+    <div class="panel" id="panel-words">
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px">Palavras do Dia</h2>
+      <div id="wordsContent">
+        <div class="empty"><div class="empty-icon">📚</div>Carregando palavras do dia...</div>
+      </div>
+    </div>
+
+    <!-- PAINEL: AGENDA -->
+    <div class="panel" id="panel-calendar">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <h2 style="font-size:1.1rem;font-weight:700">Sua Agenda Hoje</h2>
+        <button class="btn-secondary" onclick="loadCalendar(true)">🔄 Atualizar</button>
+      </div>
+      <div id="calendarContent">
+        <div class="empty"><div class="empty-icon">📅</div>Carregando agenda...</div>
+      </div>
+    </div>
+
+    <!-- PAINEL: HISTÓRICO -->
+    <div class="panel" id="panel-history">
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px">Histórico de Boletins</h2>
+      <div id="historyContent">
+        <div class="empty"><div class="empty-icon">🗂️</div>Carregando histórico...</div>
+      </div>
+    </div>
+
+    <!-- PAINEL: SETUP -->
+    <div class="panel" id="panel-setup">
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px">⚙️ Configurações</h2>
+      <div id="setupContent">
+        <div class="empty"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FAB mobile -->
+  <button class="fab" onclick="generateBulletin(true)" title="Gerar boletim rápido">⚡</button>
+
+</div>
+
+<!-- Audio element -->
+<audio id="mainAudio" preload="none"></audio>
+
+<script>
+// ─────────────────────────────────────────────
+// Config
+// ─────────────────────────────────────────────
+const API = window.location.origin;
+let currentBulletin = null;
+let audioState = { playing: false, duration: 0, current: 0 };
+let liveNewsCache = null;
+let calendarCache = null;
+let pollingInterval = null;
+
+// ─────────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = d => new Date(d).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+const fmtTime = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+async function api(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ─────────────────────────────────────────────
+// Tabs
+// ─────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    $(`panel-${tab.dataset.panel}`).classList.add('active');
+    if (tab.dataset.panel === 'news' && !liveNewsCache) loadLiveNews();
+    if (tab.dataset.panel === 'calendar') loadCalendar();
+    if (tab.dataset.panel === 'history') loadHistory();
+    if (tab.dataset.panel === 'setup') loadSetup();
+    if (tab.dataset.panel === 'words' && currentBulletin) renderWords(currentBulletin);
+  });
+});
+
+// ─────────────────────────────────────────────
+// Header
+// ─────────────────────────────────────────────
+function updateHeader() {
+  const now = new Date();
+  $('headerDate').textContent = now.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'short' });
+}
+updateHeader();
+setInterval(updateHeader, 60000);
+
+// ─────────────────────────────────────────────
+// Status
+// ─────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const s = await api('/api/status');
+    $('statusDot').className = 'status-dot online';
+    $('statusDot').title = `Online | OpenAI: ${s.openai_configured ? '✅' : '❌'} | Microsoft: ${s.microsoft_authenticated ? '✅' : '—'}`;
+  } catch {
+    $('statusDot').className = 'status-dot';
+    $('statusDot').title = 'Servidor offline';
+  }
+}
+
+// ─────────────────────────────────────────────
+// Audio Player
+// ─────────────────────────────────────────────
+const audio = $('mainAudio');
+
+audio.addEventListener('timeupdate', () => {
+  audioState.current = audio.currentTime;
+  audioState.duration = audio.duration || 0;
+  updateProgress();
+});
+audio.addEventListener('ended', () => {
+  audioState.playing = false;
+  updatePlayBtn();
+});
+audio.addEventListener('loadedmetadata', () => {
+  audioState.duration = audio.duration;
+  updateProgress();
+});
+
+function updatePlayBtn() {
+  const btn = $('playBtn');
+  if (!btn) return;
+  btn.textContent = audioState.playing ? '⏸' : '▶';
+}
+
+function updateProgress() {
+  const fill = $('progressFill');
+  const cur = $('currentTime');
+  const dur = $('durTime');
+  if (!fill) return;
+  const pct = audioState.duration ? (audioState.current / audioState.duration * 100) : 0;
+  fill.style.width = pct + '%';
+  if (cur) cur.textContent = fmtTime(audioState.current);
+  if (dur) dur.textContent = fmtTime(audioState.duration);
+}
+
+function togglePlay() {
+  if (audio.paused) {
+    audio.play();
+    audioState.playing = true;
+  } else {
+    audio.pause();
+    audioState.playing = false;
+  }
+  updatePlayBtn();
+}
+
+function seekAudio(e) {
+  const bar = e.currentTarget;
+  const rect = bar.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * (audio.duration || 0);
+}
+
+function renderAudioPlayer(bulletinId, bulletinDate, bulletinType) {
+  const label = bulletinType === 'quick' ? '⚡ Boletim Rápido' : '☀️ Boletim Matinal';
+  return `
+    <div class="card audio-card">
+      <div class="audio-title">${label}</div>
+      <div class="audio-subtitle">${fmtDate(bulletinDate)}</div>
+      <div class="audio-player">
+        <div class="player-controls">
+          <button class="btn-play" id="playBtn" onclick="togglePlay()">▶</button>
+          <div class="player-info">
+            <div class="player-name">Day — Seu Apresentador IA</div>
+            <div class="player-time" id="currentTime">00:00</div>
+          </div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar" onclick="seekAudio(event)">
+            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+          </div>
+          <div class="time-label" id="durTime">--:--</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function loadAudio(bulletinId) {
+  audio.src = `${API}/api/audio/${bulletinId}`;
+  audio.preload = 'auto';
+  audioState = { playing: false, duration: 0, current: 0 };
+  updateProgress();
+}
+
+// ─────────────────────────────────────────────
+// Today Panel
+// ─────────────────────────────────────────────
+async function loadToday() {
+  try {
+    const data = await api('/api/bulletin/today');
+    if (data.status === 'generating') {
+      renderGenerating(data.message);
+      startPolling();
+      return;
+    }
+    currentBulletin = data;
+    renderToday(data);
+    stopPolling();
+  } catch (e) {
+    renderError('Não foi possível conectar ao servidor. Verifique se o DayBay está rodando.');
+  }
+}
+
+function renderGenerating(msg) {
+  $('todayContent').innerHTML = `
+    <div class="alert alert-info">
+      <div class="spinner"></div>
+      <div>
+        <strong>Gerando seu boletim...</strong><br>
+        ${msg || 'Isso pode levar 30-60 segundos. A página vai atualizar automaticamente.'}
+      </div>
+    </div>
+    <div class="card">
+      <div class="skeleton-line skeleton" style="width:70%"></div>
+      <div class="skeleton-line skeleton" style="width:50%"></div>
+      <div class="skeleton-line skeleton" style="width:90%;margin-top:16px"></div>
+      <div class="skeleton-line skeleton" style="width:80%"></div>
+      <div class="skeleton-line skeleton" style="width:75%"></div>
+    </div>
+  `;
+}
+
+function renderError(msg) {
+  $('todayContent').innerHTML = `
+    <div class="alert alert-warn">⚠️ ${msg}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn-generate" onclick="loadToday()">🔄 Tentar novamente</button>
+    </div>
+  `;
+}
+
+function renderToday(d) {
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = d.date === today;
+  const type = d.type || 'morning';
+
+  let html = '';
+
+  // Audio player
+  if (d.has_audio) {
+    html += renderAudioPlayer(d.id, d.date, type);
+    loadAudio(d.id);
+  }
+
+  // Actions
+  html += `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;align-items:center">
+      <button class="btn-generate" onclick="generateBulletin(false)">⚡ Novo Boletim Agora</button>
+      <button class="btn-secondary" onclick="generateBulletin(true)">🎯 Resumo Rápido</button>
+      <span style="font-size:0.78rem;color:var(--text3)">Gerado ${isToday ? 'hoje' : 'em ' + fmtDate(d.date)} às ${d.generated_at ? fmt(d.generated_at) : '--'}</span>
+    </div>
+  `;
+
+  // Summaries
+  if (d.summaries && Object.keys(d.summaries).length > 0) {
+    html += `<h3 style="font-size:0.9rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2);margin-bottom:14px">Resumos por Categoria</h3>`;
+    const catEmoji = { brasil:'🇧🇷', mundo:'🌍', tecnologia:'💻', esportes:'⚽', entretenimento:'🎬', cultura:'🎭' };
+    for (const [cat, summary] of Object.entries(d.summaries)) {
+      html += `
+        <div class="summary-card">
+          <div class="summary-cat-title">${catEmoji[cat] || '📌'} ${cat.charAt(0).toUpperCase() + cat.slice(1)}</div>
+          <div class="summary-text">${summary}</div>
+        </div>
+      `;
+    }
+  }
+
+  $('todayContent').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// Generate Bulletin
+// ─────────────────────────────────────────────
+async function generateBulletin(quick = false) {
+  const msg = quick ? 'Gerando resumo rápido...' : 'Gerando novo boletim completo...';
+  $('todayContent').innerHTML = `<div class="alert alert-info"><div class="spinner"></div><div>${msg} Isso pode levar 30-60 segundos.</div></div>`;
+
+  try {
+    await api(`/api/bulletin/generate?quick=${quick}`);
+    startPolling();
+  } catch (e) {
+    renderError('Erro ao iniciar geração. Verifique o servidor.');
+  }
+}
+
+// ─────────────────────────────────────────────
+// Polling
+// ─────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  pollingInterval = setInterval(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const status = await api(`/api/bulletin/status/${today}`);
+      if (status.ready) {
+        stopPolling();
+        loadToday();
+      }
+    } catch {}
+  }, 5000);
+}
+
+function stopPolling() {
+  if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+}
+
+// ─────────────────────────────────────────────
+// News Panel
+// ─────────────────────────────────────────────
+async function loadLiveNews() {
+  $('newsContent').innerHTML = `<div class="empty"><div class="spinner"></div><div style="margin-top:8px">Buscando notícias ao vivo...</div></div>`;
+  try {
+    const data = await api('/api/news/live');
+    liveNewsCache = data;
+    renderNews(data.news);
+  } catch {
+    $('newsContent').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>Erro ao buscar notícias.</div>`;
+  }
+}
+
+function renderNews(newsByCategory) {
+  if (!newsByCategory || Object.keys(newsByCategory).length === 0) {
+    $('newsContent').innerHTML = `<div class="empty"><div class="empty-icon">📰</div>Nenhuma notícia disponível.</div>`;
+    return;
+  }
+  const catEmoji = { brasil:'🇧🇷', mundo:'🌍', tecnologia:'💻', esportes:'⚽', entretenimento:'🎬', cultura:'🎭' };
+  let html = '';
+  for (const [cat, items] of Object.entries(newsByCategory)) {
+    if (!items.length) continue;
+    const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+    html += `<div class="news-category">
+      <div class="category-header">
+        <div class="category-title">${catEmoji[cat] || '📌'} ${label}</div>
+        <span style="font-size:0.75rem;color:var(--text3)">${items.length} notícias</span>
+      </div>
+      <div class="news-grid">`;
+    for (const item of items) {
+      const time = item.published ? new Date(item.published).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+      html += `
+        <div class="news-item">
+          <div class="news-source">${item.source}</div>
+          <div class="news-headline"><a href="${item.link}" target="_blank" rel="noopener">${item.title}</a></div>
+          ${item.summary ? `<div class="news-summary">${item.summary}</div>` : ''}
+          ${time ? `<div class="news-time">${time}</div>` : ''}
+        </div>`;
+    }
+    html += `</div></div>`;
+  }
+  $('newsContent').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// Words Panel
+// ─────────────────────────────────────────────
+function renderWords(bulletin) {
+  if (!bulletin || (!bulletin.english_word && !bulletin.mandarin_word)) {
+    $('wordsContent').innerHTML = `<div class="empty"><div class="empty-icon">📚</div>Gere um boletim primeiro para ver as palavras do dia.</div>`;
+    return;
+  }
+  let html = '<div class="grid-2">';
+  if (bulletin.english_word) {
+    const w = bulletin.english_word;
+    html += `
+      <div class="word-card">
+        <div class="word-header">
+          <div class="word-lang">🇺🇸 Inglês Avançado — ${w.level || 'C1/C2'}</div>
+          <div class="word-main">${w.word}</div>
+          <div class="word-phonetic">${w.phonetic || ''} · ${w.type || ''}</div>
+        </div>
+        <div class="word-body">
+          <div class="word-row">
+            <span class="word-label">PT</span>
+            <span class="word-value">${w.definition_pt}</span>
+          </div>
+          <div class="word-row">
+            <span class="word-label">EN</span>
+            <span class="word-value" style="color:var(--text2)">${w.definition_en || ''}</span>
+          </div>
+          <div class="word-example">
+            <div class="word-example-en">"${w.example_en || ''}"</div>
+            <div class="word-example-pt">${w.example_pt || ''}</div>
+          </div>
+          ${w.tip ? `<div class="word-tip">${w.tip}</div>` : ''}
+        </div>
+      </div>`;
+  }
+  if (bulletin.mandarin_word) {
+    const w = bulletin.mandarin_word;
+    html += `
+      <div class="word-card">
+        <div class="word-header" style="background:linear-gradient(135deg,rgba(248,113,113,0.12),rgba(251,191,36,0.12))">
+          <div class="word-lang">🇨🇳 Mandarim — HSK ${w.hsk_level || 1}</div>
+          <div class="word-main">${w.word}</div>
+          <div class="word-phonetic">${w.pinyin || ''} · ${w.type || ''}</div>
+        </div>
+        <div class="word-body">
+          <div class="word-row">
+            <span class="word-label">PT</span>
+            <span class="word-value">${w.definition_pt}</span>
+          </div>
+          <div class="word-row">
+            <span class="word-label">Pinyin</span>
+            <span class="word-value" style="color:var(--text2)">${w.pinyin_numbers || ''}</span>
+          </div>
+          <div class="word-example">
+            <div class="word-example-en">"${w.example_zh || ''}"</div>
+            <div class="word-example-pt">${w.example_pinyin || ''}<br><span style="opacity:0.7">${w.example_pt || ''}</span></div>
+          </div>
+          ${w.tip ? `<div class="word-tip">${w.tip}</div>` : ''}
+        </div>
+      </div>`;
+  }
+  html += '</div>';
+  $('wordsContent').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// Calendar Panel
+// ─────────────────────────────────────────────
+async function loadCalendar(force = false) {
+  if (calendarCache && !force) { renderCalendar(calendarCache); return; }
+  $('calendarContent').innerHTML = `<div class="empty"><div class="spinner"></div></div>`;
+  try {
+    const data = await api('/api/calendar/today');
+    calendarCache = data;
+    renderCalendar(data);
+  } catch {
+    $('calendarContent').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>Erro ao buscar agenda.</div>`;
+  }
+}
+
+function renderCalendar(data) {
+  if (!data.authenticated) {
+    $('calendarContent').innerHTML = `
+      <div class="setup-card">
+        <div class="setup-title">📅 Conectar Microsoft Calendar</div>
+        <div class="setup-desc">Para ver suas reuniões e tarefas, conecte sua conta Microsoft.</div>
+        <button class="btn-generate" onclick="startMSAuth()">🔗 Conectar Conta Microsoft</button>
+      </div>`;
+    return;
+  }
+
+  let html = '<div class="grid-2">';
+
+  // Eventos
+  html += `<div class="card"><div class="card-header"><div class="card-title">📆 Reuniões de Hoje</div></div>`;
+  if (!data.events.length) {
+    html += `<div style="color:var(--text3);font-size:0.88rem">Nenhuma reunião hoje. ✨</div>`;
+  } else {
+    for (const ev of data.events) {
+      html += `
+        <div class="event-item">
+          <div class="event-time">${ev.start.slice(-5)}</div>
+          <div class="event-info">
+            <div class="event-subject">${ev.subject}${ev.is_online ? '<span class="event-online">Online</span>' : ''}</div>
+            <div class="event-meta">${ev.end.slice(-5)} ${ev.location ? '· ' + ev.location : ''}</div>
+          </div>
+        </div>`;
+    }
+  }
+  html += `</div>`;
+
+  // Tarefas
+  html += `<div class="card"><div class="card-header"><div class="card-title">✅ Tarefas Pendentes</div></div>`;
+  if (!data.tasks.length) {
+    html += `<div style="color:var(--text3);font-size:0.88rem">Nenhuma tarefa pendente. 🎉</div>`;
+  } else {
+    for (const task of data.tasks) {
+      const isHigh = task.importance === 'high';
+      html += `
+        <div class="task-item ${isHigh ? 'task-high' : ''}">
+          <div class="task-check"></div>
+          <div>
+            <div class="task-title">${isHigh ? '⚠️ ' : ''}${task.title}</div>
+            <div class="task-due">
+              ${task.list_name ? `<span class="task-list-name">${task.list_name}</span>` : ''}
+              ${task.due_date ? ` · Vence ${task.due_date}` : ''}
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+  html += `</div></div>`;
+
+  $('calendarContent').innerHTML = html;
+}
+
+let authPolling = null;
+async function startMSAuth() {
+  try {
+    const flow = await api('/api/calendar/auth/start');
+    $('calendarContent').innerHTML = `
+      <div class="setup-card">
+        <div class="setup-title">🔗 Login Microsoft</div>
+        <div class="setup-desc">
+          1. Acesse o link abaixo<br>
+          2. Digite o código quando solicitado<br>
+          3. Faça login com sua conta Microsoft
+        </div>
+        <div style="margin:16px 0">
+          <a href="${flow.verification_uri}" target="_blank" class="btn-generate" style="display:inline-flex;margin-bottom:12px">
+            🌐 Abrir Página de Login
+          </a>
+          <div style="margin-top:12px">
+            <div style="font-size:0.78rem;color:var(--text2);margin-bottom:4px">Código de acesso:</div>
+            <div class="code-block">${flow.user_code}</div>
+          </div>
+        </div>
+        <div class="alert alert-info"><div class="spinner"></div><div>Aguardando login... (verificando automaticamente)</div></div>
+      </div>`;
+    authPolling = setInterval(async () => {
+      const result = await api('/api/calendar/auth/complete');
+      if (result.status === 'authenticated') {
+        clearInterval(authPolling);
+        loadCalendar(true);
+      }
+    }, 5000);
+  } catch (e) {
+    $('calendarContent').innerHTML = `<div class="alert alert-warn">⚠️ Configure MICROSOFT_CLIENT_ID no arquivo .env primeiro.</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────
+// History Panel
+// ─────────────────────────────────────────────
+async function loadHistory() {
+  $('historyContent').innerHTML = `<div class="empty"><div class="spinner"></div></div>`;
+  try {
+    const list = await api('/api/bulletins/list');
+    if (!list.length) {
+      $('historyContent').innerHTML = `<div class="empty"><div class="empty-icon">🗂️</div>Nenhum boletim gerado ainda.</div>`;
+      return;
+    }
+    let html = '';
+    for (const item of list) {
+      const typeLabel = item.type === 'quick' ? 'Rápido' : 'Matinal';
+      const typeClass = item.type === 'quick' ? 'type-quick' : 'type-morning';
+      html += `
+        <div class="history-item" onclick="loadBulletinDate('${item.date}', '${item.type}')">
+          <div class="history-date">${fmtDate(item.date)}</div>
+          <span class="history-type badge ${typeClass}">${typeLabel}</span>
+          <div class="history-info">
+            ${item.categories?.join(', ') || '—'}
+          </div>
+          <div class="history-audio">${item.has_audio ? '🔊' : ''}</div>
+        </div>`;
+    }
+    $('historyContent').innerHTML = html;
+  } catch {
+    $('historyContent').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar histórico.</div>`;
+  }
+}
+
+async function loadBulletinDate(dateStr, type) {
+  try {
+    const data = await api(`/api/bulletin/${dateStr}?bulletin_type=${type}`);
+    currentBulletin = data;
+    // Switch to today tab and render
+    document.querySelector('.tab[data-panel="today"]').click();
+    renderToday(data);
+  } catch {}
+}
+
+// ─────────────────────────────────────────────
+// Setup Panel
+// ─────────────────────────────────────────────
+async function loadSetup() {
+  try {
+    const s = await api('/api/status');
+    $('setupContent').innerHTML = `
+      <div class="setup-card">
+        <div class="setup-title">🔑 OpenAI API</div>
+        <div class="setup-desc">Necessário para gerar resumos, palavras do dia e áudio TTS.</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge ${s.openai_configured ? 'badge-ok' : 'badge-missing'}">
+            ${s.openai_configured ? '✅ Configurado' : '❌ Não configurado'}
+          </span>
+          ${!s.openai_configured ? `<a href="https://platform.openai.com/api-keys" target="_blank" style="font-size:0.82rem">Criar chave →</a>` : ''}
+        </div>
+        ${!s.openai_configured ? `<div style="margin-top:12px;font-size:0.83rem;color:var(--text2)">
+          Adicione sua chave no arquivo <code style="color:var(--accent)">.env</code>:
+          <div class="code-block">OPENAI_API_KEY=sk-...</div>
+        </div>` : ''}
+      </div>
+      <div class="setup-card">
+        <div class="setup-title">📅 Microsoft Calendar</div>
+        <div class="setup-desc">Opcional — para ver reuniões e tarefas do Outlook/Teams.</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge ${s.microsoft_authenticated ? 'badge-ok' : 'badge-optional'}">
+            ${s.microsoft_authenticated ? '✅ Conectado' : '○ Não conectado'}
+          </span>
+        </div>
+        ${!s.microsoft_authenticated ? `<div style="margin-top:12px">
+          <a href="https://portal.azure.com" target="_blank" class="btn-secondary" style="font-size:0.82rem;margin-bottom:10px;display:inline-flex">Criar App no Azure →</a>
+          <div style="font-size:0.82rem;color:var(--text2);margin-top:8px">
+            Configure no <code style="color:var(--accent)">.env</code>:
+            <div class="code-block">MICROSOFT_CLIENT_ID=seu-client-id
+MICROSOFT_TENANT_ID=common</div>
+            Depois vá em <strong>Agenda</strong> para conectar.
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="setup-card">
+        <div class="setup-title">🎙️ Servidor</div>
+        <div class="setup-desc">Informações do servidor DayBay rodando localmente.</div>
+        <div style="font-size:0.83rem;color:var(--text2);display:flex;flex-direction:column;gap:6px">
+          <div>Modelo: <code style="color:var(--accent)">${s.model}</code></div>
+          <div>Voz TTS: <code style="color:var(--accent)">${s.voice}</code></div>
+          <div>Status: <span class="badge badge-ok">Online</span></div>
+          <div>URL: <code style="color:var(--accent3)">${API}</code></div>
+        </div>
+      </div>
+      <div class="setup-card">
+        <div class="setup-title">📱 Acesso Mobile</div>
+        <div class="setup-desc">Abra no seu celular pelo endereço abaixo (mesma rede Wi-Fi).</div>
+        <div class="code-block" id="mobileUrl">Descobrindo IP...</div>
+        <div style="font-size:0.78rem;color:var(--text3);margin-top:6px">
+          Certifique-se de que o celular está na mesma rede Wi-Fi que o computador.
+        </div>
+      </div>`;
+    // Descobre o IP local via ws
+    getMobileUrl();
+  } catch {
+    $('setupContent').innerHTML = `<div class="alert alert-warn">⚠️ Servidor offline. Verifique se o DayBay está rodando.</div>`;
+  }
+}
+
+function getMobileUrl() {
+  const el = $('mobileUrl');
+  if (!el) return;
+  const host = window.location.hostname;
+  const port = window.location.port;
+  if (host !== 'localhost' && host !== '127.0.0.1') {
+    el.textContent = window.location.origin;
+  } else {
+    el.textContent = `http://<seu-ip-local>:${port || 8000}\n(Descubra seu IP: Settings → Wi-Fi → nome da rede)`;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+(async () => {
+  await checkStatus();
+  await loadToday();
+  setInterval(checkStatus, 30000);
+})();
+</script>
+</body>
+</html>
