@@ -1,13 +1,13 @@
 """
 DayBay Daily — Gerador de Boletim
-Usa OpenAI para resumir notícias e montar o boletim completo do dia
+Usa Anthropic Claude para resumir notícias e montar o boletim completo do dia
 """
 
 import json
 import logging
 from datetime import date, datetime
 from typing import Dict, List, Optional
-from openai import AsyncOpenAI
+import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ CATEGORY_EMOJI = {
 
 
 async def summarize_news(
-    client: AsyncOpenAI,
+    client: anthropic.AsyncAnthropic,
     model: str,
     news_by_category: Dict[str, List[Dict]],
 ) -> Dict[str, str]:
@@ -60,13 +60,13 @@ Escreva um breve resumo falado (2-3 parágrafos, máx 200 palavras) sobre estas 
 - Comece diretamente com o conteúdo (sem "Olá" nem saudações)"""
 
         try:
-            response = await client.chat.completions.create(
+            response = await client.messages.create(
                 model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.75,
                 max_tokens=350,
+                temperature=0.75,
+                messages=[{"role": "user", "content": prompt}],
             )
-            summaries[category] = response.choices[0].message.content.strip()
+            summaries[category] = response.content[0].text.strip()
         except Exception as e:
             logger.error(f"Erro ao resumir {category}: {e}")
             titles = [item["title"] for item in items[:3]]
@@ -76,7 +76,7 @@ Escreva um breve resumo falado (2-3 parágrafos, máx 200 palavras) sobre estas 
 
 
 async def generate_bulletin_script(
-    client: AsyncOpenAI,
+    client: anthropic.AsyncAnthropic,
     model: str,
     today: date,
     category_summaries: Dict[str, str],
@@ -148,20 +148,20 @@ INSTRUÇÕES PARA O SCRIPT:
 - Duração estimada de leitura: 5-8 minutos"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await client.messages.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
             max_tokens=2000,
+            temperature=0.8,
+            messages=[{"role": "user", "content": prompt}],
         )
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()
     except Exception as e:
         logger.error(f"Erro ao gerar script: {e}")
         return f"Bom dia! Hoje é {date_str}. Seu boletim está sendo preparado. Por favor, tente novamente em instantes."
 
 
 async def generate_quick_summary(
-    client: AsyncOpenAI,
+    client: anthropic.AsyncAnthropic,
     model: str,
     news_by_category: Dict[str, List[Dict]],
     events: List[Dict],
@@ -199,13 +199,13 @@ NOTÍCIAS DO DIA:
 - Apenas texto corrido, sem markdown"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await client.messages.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
             max_tokens=700,
+            temperature=0.8,
+            messages=[{"role": "user", "content": prompt}],
         )
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()
     except Exception as e:
         logger.error(f"Erro ao gerar resumo rápido: {e}")
         return "Boa tarde! Aqui está o resumo rápido do seu dia. Os destaques estão disponíveis no seu painel."

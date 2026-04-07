@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+import anthropic
 
 # Carrega .env
 env_path = Path(__file__).parent.parent / ".env"
@@ -43,9 +43,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("daybay")
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
-OPENAI_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "nova")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+TTS_VOICE = os.getenv("TTS_VOICE", "pt-BR-FranciscaNeural")
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "bulletins"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -74,13 +74,13 @@ if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 
-def get_openai_client() -> AsyncOpenAI:
-    if not OPENAI_API_KEY:
+def get_anthropic_client() -> anthropic.AsyncAnthropic:
+    if not ANTHROPIC_API_KEY:
         raise HTTPException(
             status_code=503,
-            detail="OPENAI_API_KEY não configurada. Configure o arquivo .env"
+            detail="ANTHROPIC_API_KEY não configurada. Configure o arquivo .env"
         )
-    return AsyncOpenAI(api_key=OPENAI_API_KEY)
+    return anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
 
 def bulletin_path(date_str: str, bulletin_type: str = "morning") -> Path:
@@ -121,10 +121,10 @@ async def status():
     """Status do servidor e configurações."""
     return {
         "status": "online",
-        "openai_configured": bool(OPENAI_API_KEY),
+        "anthropic_configured": bool(ANTHROPIC_API_KEY),
         "microsoft_authenticated": is_authenticated(),
-        "model": OPENAI_MODEL,
-        "voice": OPENAI_TTS_VOICE,
+        "model": ANTHROPIC_MODEL,
+        "voice": TTS_VOICE,
         "server_time": datetime.now().isoformat(),
     }
 
@@ -278,7 +278,7 @@ async def generate_bulletin_task(date_str: str, bulletin_type: str):
     logger.info(f"🔄 Gerando boletim: {date_str} [{bulletin_type}]")
 
     try:
-        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
         today = date.fromisoformat(date_str)
 
         # 1. Busca notícias
@@ -293,28 +293,28 @@ async def generate_bulletin_task(date_str: str, bulletin_type: str):
         # 3. Palavras do dia
         logger.info("📚 Gerando palavras do dia...")
         english_word, mandarin_word = await asyncio.gather(
-            get_english_word(client, OPENAI_MODEL, today),
-            get_mandarin_word(client, OPENAI_MODEL, today),
+            get_english_word(client, ANTHROPIC_MODEL, today),
+            get_mandarin_word(client, ANTHROPIC_MODEL, today),
         )
 
         # 4. Resumos de notícias
         logger.info("✍️  Resumindo notícias...")
         if bulletin_type == "quick":
-            script = await generate_quick_summary(client, OPENAI_MODEL, news_by_category, events)
+            script = await generate_quick_summary(client, ANTHROPIC_MODEL, news_by_category, events)
             summaries = {}
         else:
-            summaries = await summarize_news(client, OPENAI_MODEL, news_by_category)
+            summaries = await summarize_news(client, ANTHROPIC_MODEL, news_by_category)
             # 5. Script completo
             logger.info("🎙️  Gerando script do boletim...")
             script = await generate_bulletin_script(
-                client, OPENAI_MODEL, today,
+                client, ANTHROPIC_MODEL, today,
                 summaries, english_word, mandarin_word, events, tasks,
             )
 
-        # 6. Áudio TTS
+        # 6. Áudio TTS (Edge TTS — Microsoft Neural, gratuito)
         logger.info("🔊 Gerando áudio...")
         bulletin_id = f"{date_str}_{bulletin_type}"
-        audio_path = await generate_audio(client, script, bulletin_id, OPENAI_TTS_VOICE)
+        audio_path = await generate_audio(script, bulletin_id, TTS_VOICE)
 
         # 7. Salva o boletim
         bulletin_data = {
@@ -347,8 +347,8 @@ async def generate_bulletin_task(date_str: str, bulletin_type: str):
 @app.on_event("startup")
 async def startup_event():
     logger.info("🌅 DayBay Daily iniciado!")
-    if not OPENAI_API_KEY:
-        logger.warning("⚠️  OPENAI_API_KEY não configurada — configure o arquivo .env")
+    if not ANTHROPIC_API_KEY:
+        logger.warning("⚠️  ANTHROPIC_API_KEY não configurada — configure o arquivo .env")
         return
 
     today_str = date.today().isoformat()

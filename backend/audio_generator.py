@@ -1,20 +1,28 @@
 """
-DayBay Daily — Gerador de Áudio com OpenAI TTS
-Converte o script do boletim em áudio MP3
+DayBay Daily — Gerador de Áudio com Edge TTS (Microsoft Neural)
+Converte o script do boletim em áudio MP3 usando vozes neurais gratuitas
 """
 
-import os
+import asyncio
 import logging
+import tempfile
+import os
 from pathlib import Path
-from openai import AsyncOpenAI
+
+import edge_tts
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "audio"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Limite de caracteres por chamada TTS (OpenAI aceita até 4096)
-TTS_CHUNK_SIZE = 4000
+# Limite de caracteres por chunk (edge-tts suporta textos longos, mas chunks garantem estabilidade)
+TTS_CHUNK_SIZE = 3000
+
+# Vozes disponíveis em pt-BR:
+# pt-BR-FranciscaNeural (feminina, padrão)
+# pt-BR-AntonioNeural   (masculina)
+DEFAULT_VOICE = "pt-BR-FranciscaNeural"
 
 
 def _split_text(text: str, max_chars: int = TTS_CHUNK_SIZE) -> list[str]:
@@ -41,13 +49,12 @@ def _split_text(text: str, max_chars: int = TTS_CHUNK_SIZE) -> list[str]:
 
 
 async def generate_audio(
-    client: AsyncOpenAI,
     script: str,
     bulletin_id: str,
-    voice: str = "nova",
+    voice: str = DEFAULT_VOICE,
 ) -> str:
     """
-    Gera arquivo de áudio MP3 a partir do script.
+    Gera arquivo de áudio MP3 a partir do script usando Edge TTS.
     Retorna o caminho do arquivo gerado.
     """
     output_path = DATA_DIR / f"{bulletin_id}.mp3"
@@ -63,13 +70,17 @@ async def generate_audio(
 
     for i, chunk in enumerate(chunks):
         try:
-            response = await client.audio.speech.create(
-                model="tts-1-hd",
-                voice=voice,
-                input=chunk,
-                response_format="mp3",
-            )
-            audio_parts.append(response.content)
+            communicate = edge_tts.Communicate(chunk, voice)
+            # Grava em arquivo temporário e lê os bytes
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                tmp_path = tmp.name
+
+            await communicate.save(tmp_path)
+
+            with open(tmp_path, "rb") as f:
+                audio_parts.append(f.read())
+
+            os.unlink(tmp_path)
             logger.info(f"  Chunk {i+1}/{len(chunks)} gerado ({len(chunk)} chars)")
         except Exception as e:
             logger.error(f"  Erro no chunk {i+1}: {e}")

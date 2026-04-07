@@ -1,18 +1,19 @@
 """
 DayBay Daily — Palavra do Dia (Inglês Avançado + Mandarim Básico)
-Usa OpenAI para gerar palavras únicas e contextualizadas por dia
+Usa Anthropic Claude para gerar palavras únicas e contextualizadas por dia
 """
 
+import json
 import hashlib
+import logging
 from datetime import date
 from typing import Dict
-from openai import AsyncOpenAI
-import logging
+import anthropic
 
 logger = logging.getLogger(__name__)
 
 
-async def get_english_word(client: AsyncOpenAI, model: str, today: date) -> Dict:
+async def get_english_word(client: anthropic.AsyncAnthropic, model: str, today: date) -> Dict:
     """
     Gera uma palavra em inglês de nível avançado para o dia.
     Usa a data como seed para consistência ao longo do dia.
@@ -23,7 +24,7 @@ async def get_english_word(client: AsyncOpenAI, model: str, today: date) -> Dict
 
 Use o número {seed} como variação para escolher uma palavra diferente a cada dia.
 
-Responda SOMENTE em JSON com esta estrutura exata:
+Responda SOMENTE com um JSON válido, sem texto adicional, com esta estrutura exata:
 {{
   "word": "palavra em inglês",
   "phonetic": "transcrição fonética simplificada",
@@ -36,14 +37,19 @@ Responda SOMENTE em JSON com esta estrutura exata:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await client.messages.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
             temperature=0.7,
-            response_format={"type": "json_object"},
+            messages=[{"role": "user", "content": prompt}],
         )
-        import json
-        data = json.loads(response.choices[0].message.content)
+        text = response.content[0].text.strip()
+        # Remove possível markdown ```json ... ```
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        data = json.loads(text.strip())
         data["language"] = "english"
         data["level"] = "advanced"
         return data
@@ -63,7 +69,7 @@ Responda SOMENTE em JSON com esta estrutura exata:
         }
 
 
-async def get_mandarin_word(client: AsyncOpenAI, model: str, today: date) -> Dict:
+async def get_mandarin_word(client: anthropic.AsyncAnthropic, model: str, today: date) -> Dict:
     """
     Gera uma palavra em mandarim de nível básico (HSK 1-2) para o dia.
     """
@@ -73,7 +79,7 @@ async def get_mandarin_word(client: AsyncOpenAI, model: str, today: date) -> Dic
 
 Use o número {seed} como variação para escolher uma palavra diferente a cada dia.
 
-Responda SOMENTE em JSON com esta estrutura exata:
+Responda SOMENTE com um JSON válido, sem texto adicional, com esta estrutura exata:
 {{
   "word": "caractere(s) em mandarim",
   "pinyin": "romanização com tons (ex: nǐ hǎo)",
@@ -83,20 +89,25 @@ Responda SOMENTE em JSON com esta estrutura exata:
   "example_zh": "frase de exemplo em mandarim",
   "example_pinyin": "frase em pinyin",
   "example_pt": "tradução da frase",
-  "stroke_count": número de traços do caractere principal,
+  "stroke_count": 5,
   "tip": "dica cultural ou de memorização",
   "hsk_level": 1
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await client.messages.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
             temperature=0.7,
-            response_format={"type": "json_object"},
+            messages=[{"role": "user", "content": prompt}],
         )
-        import json
-        data = json.loads(response.choices[0].message.content)
+        text = response.content[0].text.strip()
+        # Remove possível markdown ```json ... ```
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        data = json.loads(text.strip())
         data["language"] = "mandarin"
         data["level"] = "basic"
         return data
