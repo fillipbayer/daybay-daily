@@ -186,33 +186,48 @@
     .btn-secondary:hover { border-color: var(--accent); }
 
     /* ─── News Cards ─── */
-    .news-category { margin-bottom: 28px; }
+    .news-category { margin-bottom: 32px; }
     .category-header {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 12px; padding-bottom: 8px;
-      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px; padding-bottom: 10px;
+      border-bottom: 2px solid var(--border);
     }
-    .category-title { font-size: 1rem; font-weight: 700; }
-    .news-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .category-title { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .category-count {
+      font-size: 0.72rem; font-weight: 600; padding: 2px 8px;
+      border-radius: 20px; background: var(--bg3); color: var(--text2);
+    }
+    .news-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
     .news-item {
       background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 14px;
-      transition: border-color 0.2s, transform 0.15s;
+      border-radius: var(--radius-sm); padding: 16px;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.15s;
+      display: flex; flex-direction: column; gap: 8px;
+      position: relative; overflow: hidden;
     }
-    .news-item:hover { border-color: #353840; transform: translateY(-1px); }
+    .news-item::before {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 3px; height: 100%; background: var(--accent);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .news-item:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(108,143,255,0.1); }
+    .news-item:hover::before { opacity: 1; }
+    .news-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .news-source {
-      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.4px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px;
       text-transform: uppercase; color: var(--accent);
-      margin-bottom: 6px;
+      background: rgba(108,143,255,0.1); padding: 2px 8px;
+      border-radius: 4px; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 160px;
     }
+    .news-time { font-size: 0.7rem; color: var(--text3); white-space: nowrap; }
     .news-headline {
-      font-size: 0.9rem; font-weight: 600; line-height: 1.4;
-      margin-bottom: 6px;
+      font-size: 0.92rem; font-weight: 600; line-height: 1.45;
     }
     .news-headline a { color: var(--text); }
     .news-headline a:hover { color: var(--accent); text-decoration: none; }
-    .news-summary { font-size: 0.8rem; color: var(--text2); line-height: 1.5; }
-    .news-time { font-size: 0.72rem; color: var(--text3); margin-top: 8px; }
+    .news-summary { font-size: 0.8rem; color: var(--text2); line-height: 1.55; }
+    .news-read-more { font-size: 0.75rem; color: var(--accent); margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; }
 
     /* ─── Summary Cards ─── */
     .summary-card {
@@ -727,7 +742,8 @@ async function generateBulletin(quick = false) {
   $('todayContent').innerHTML = `<div class="alert alert-info"><div class="spinner"></div><div>${msg} Isso pode levar 30-60 segundos.</div></div>`;
 
   try {
-    await api(`/api/bulletin/generate?quick=${quick}`);
+    // POST é obrigatório para este endpoint
+    await fetch(API + `/api/bulletin/generate?quick=${quick}`, { method: 'POST' });
     startPolling();
   } catch (e) {
     renderError('Erro ao iniciar geração. Verifique o servidor.');
@@ -775,24 +791,33 @@ function renderNews(newsByCategory) {
     return;
   }
   const catEmoji = { brasil:'🇧🇷', mundo:'🌍', tecnologia:'💻', esportes:'⚽', entretenimento:'🎬', cultura:'🎭' };
+  const catLabel = { brasil:'Brasil', mundo:'Mundo', tecnologia:'Tecnologia', esportes:'Esportes', entretenimento:'Entretenimento', cultura:'Cultura' };
+  const catOrder = ['brasil', 'mundo', 'tecnologia', 'esportes', 'entretenimento', 'cultura'];
+  const sorted = [...catOrder.filter(c => newsByCategory[c]?.length), ...Object.keys(newsByCategory).filter(c => !catOrder.includes(c) && newsByCategory[c]?.length)];
+
   let html = '';
-  for (const [cat, items] of Object.entries(newsByCategory)) {
-    if (!items.length) continue;
-    const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+  for (const cat of sorted) {
+    const items = newsByCategory[cat];
+    if (!items?.length) continue;
+    const label = catLabel[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1));
     html += `<div class="news-category">
       <div class="category-header">
         <div class="category-title">${catEmoji[cat] || '📌'} ${label}</div>
-        <span style="font-size:0.75rem;color:var(--text3)">${items.length} notícias</span>
+        <span class="category-count">${items.length} notícias</span>
       </div>
       <div class="news-grid">`;
     for (const item of items) {
       const time = item.published ? new Date(item.published).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+      const summary = item.summary ? item.summary.substring(0, 120) + (item.summary.length > 120 ? '…' : '') : '';
       html += `
         <div class="news-item">
-          <div class="news-source">${item.source}</div>
+          <div class="news-meta">
+            <span class="news-source">${item.source}</span>
+            ${time ? `<span class="news-time">🕐 ${time}</span>` : ''}
+          </div>
           <div class="news-headline"><a href="${item.link}" target="_blank" rel="noopener">${item.title}</a></div>
-          ${item.summary ? `<div class="news-summary">${item.summary}</div>` : ''}
-          ${time ? `<div class="news-time">${time}</div>` : ''}
+          ${summary ? `<div class="news-summary">${summary}</div>` : ''}
+          <a href="${item.link}" target="_blank" rel="noopener" class="news-read-more">Ler mais →</a>
         </div>`;
     }
     html += `</div></div>`;

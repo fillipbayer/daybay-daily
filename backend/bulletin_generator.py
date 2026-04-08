@@ -16,6 +16,12 @@ WEEKDAYS_PT = {
     3: "Quinta-feira", 4: "Sexta-feira", 5: "Sábado", 6: "Domingo",
 }
 
+MONTHS_PT = {
+    1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+    5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+    9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro",
+}
+
 CATEGORY_EMOJI = {
     "brasil": "🇧🇷",
     "mundo": "🌍",
@@ -89,7 +95,7 @@ async def generate_bulletin_script(
     Gera o script completo do boletim para leitura em áudio.
     """
     weekday = WEEKDAYS_PT[today.weekday()]
-    date_str = today.strftime(f"{weekday}, %d de %B de %Y")
+    date_str = f"{weekday}, {today.day:02d} de {MONTHS_PT[today.month]} de {today.year}"
 
     # Monta contexto de agenda
     agenda_text = ""
