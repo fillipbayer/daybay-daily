@@ -713,6 +713,7 @@ function renderToday(d) {
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;align-items:center">
       <button class="btn-generate" onclick="generateBulletin(false)">⚡ Novo Boletim Agora</button>
       <button class="btn-secondary" onclick="generateBulletin(true)">🎯 Resumo Rápido</button>
+      <button class="btn-secondary" onclick="regenerateBulletin(false)" title="Apaga o boletim atual e gera do zero com áudio novo">🔄 Regenerar</button>
       <span style="font-size:0.78rem;color:var(--text3)">Gerado ${isToday ? 'hoje' : 'em ' + fmtDate(d.date)} às ${d.generated_at ? fmt(d.generated_at) : '--'}</span>
     </div>
   `;
@@ -737,17 +738,21 @@ function renderToday(d) {
 // ─────────────────────────────────────────────
 // Generate Bulletin
 // ─────────────────────────────────────────────
-async function generateBulletin(quick = false) {
+async function generateBulletin(quick = false, force = false) {
   const msg = quick ? 'Gerando resumo rápido...' : 'Gerando novo boletim completo...';
-  $('todayContent').innerHTML = `<div class="alert alert-info"><div class="spinner"></div><div>${msg} Isso pode levar 30-60 segundos.</div></div>`;
+  $('todayContent').innerHTML = `<div class="alert alert-info"><div class="spinner"></div><div>${msg}<br><small style="opacity:.7">Isso pode levar 60-90 segundos. Buscando notícias + IA + áudio...</small></div></div>`;
 
   try {
-    // POST é obrigatório para este endpoint
-    await fetch(API + `/api/bulletin/generate?quick=${quick}`, { method: 'POST' });
+    await fetch(API + `/api/bulletin/generate?quick=${quick}&force=${force}`, { method: 'POST' });
     startPolling();
   } catch (e) {
     renderError('Erro ao iniciar geração. Verifique o servidor.');
   }
+}
+
+async function regenerateBulletin(quick = false) {
+  if (!confirm('Regenerar o boletim de hoje do zero? O áudio atual será substituído.')) return;
+  await generateBulletin(quick, true);
 }
 
 // ─────────────────────────────────────────────

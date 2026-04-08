@@ -52,16 +52,22 @@ async def generate_audio(
     script: str,
     bulletin_id: str,
     voice: str = DEFAULT_VOICE,
+    force: bool = False,
 ) -> str:
     """
     Gera arquivo de áudio MP3 a partir do script usando Edge TTS.
     Retorna o caminho do arquivo gerado.
+    force=True apaga o arquivo anterior e regenera.
     """
     output_path = DATA_DIR / f"{bulletin_id}.mp3"
 
     if output_path.exists():
-        logger.info(f"Áudio já existe: {output_path}")
-        return str(output_path)
+        if not force:
+            logger.info(f"Áudio já existe: {output_path}")
+            return str(output_path)
+        else:
+            output_path.unlink()
+            logger.info(f"Áudio anterior removido para regeneração: {output_path}")
 
     chunks = _split_text(script)
     logger.info(f"Gerando áudio em {len(chunks)} chunk(s)... Voz: {voice}")

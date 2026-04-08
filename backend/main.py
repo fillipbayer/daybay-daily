@@ -161,10 +161,11 @@ async def get_bulletin_by_date(date_str: str, bulletin_type: str = "morning"):
 
 
 @app.post("/api/bulletin/generate")
-async def generate_now(background_tasks: BackgroundTasks, quick: bool = False):
+async def generate_now(background_tasks: BackgroundTasks, quick: bool = False, force: bool = False):
     """
     Gera um novo boletim on-demand (ex: boletim das 18h).
     quick=true gera um resumo rápido mais curto.
+    force=true apaga o boletim e áudio existentes e regenera do zero.
     """
     today_str = date.today().isoformat()
     bulletin_type = "quick" if quick else "morning"
@@ -173,11 +174,19 @@ async def generate_now(background_tasks: BackgroundTasks, quick: bool = False):
     if _generating.get(key):
         return {"status": "generating", "message": "Já em geração, aguarde..."}
 
-    background_tasks.add_task(generate_bulletin_task, today_str, bulletin_type)
+    if force:
+        # Apaga arquivos existentes para forçar regeneração completa
+        bp = bulletin_path(today_str, bulletin_type)
+        if bp.exists():
+            bp.unlink()
+            logger.info(f"Boletim anterior removido para regeneração: {bp}")
+
+    background_tasks.add_task(generate_bulletin_task, today_str, bulletin_type, force=force)
     return {
         "status": "started",
-        "message": "Gerando boletim... Isso pode levar 30-60 segundos.",
+        "message": "Gerando boletim do zero... Isso pode levar 60-90 segundos.",
         "type": bulletin_type,
+        "force": force,
     }
 
 
@@ -224,12 +233,36 @@ async def list_bulletins():
     return bulletins
 
 
+@app.get("/api/bulletin/script/{date_str}")
+async def get_bulletin_script(date_str: str, bulletin_type: str = "morning"):
+    """Retorna o script de texto do boletim para depuração."""
+    bulletin = load_bulletin(date_str, bulletin_type)
+    if not bulletin:
+        raise HTTPException(status_code=404, detail=f"Boletim não encontrado para {date_str}")
+    script = bulletin.get("script", "")
+    word_count = len(script.split()) if script else 0
+    return {
+        "date": date_str,
+        "type": bulletin_type,
+        "word_count": word_count,
+        "char_count": len(script),
+        "estimated_duration_min": round(word_count / 150, 1),
+        "script": script,
+    }
+
+
 @app.get("/api/news/live")
 async def get_live_news():
     """Busca notícias ao vivo sem gerar um boletim completo."""
     try:
         news = await fetch_all_news()
-        return {"news": news, "fetched_at": datetime.now().isoformat()}
+        total = sum(len(v) for v in news.values())
+        return {
+            "news": news,
+            "total_items": total,
+            "per_category": {cat: len(items) for cat, items in news.items()},
+            "fetched_at": datetime.now().isoformat(),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -271,7 +304,7 @@ async def complete_calendar_auth():
 # Tarefa de geração em background
 # ─────────────────────────────────────────────
 
-async def generate_bulletin_task(date_str: str, bulletin_type: str):
+async def generate_bulletin_task(date_str: str, bulletin_type: str, force: bool = False):
     """Gera um boletim completo de forma assíncrona."""
     key = f"{date_str}_{bulletin_type}"
     _generating[key] = True
@@ -314,7 +347,7 @@ async def generate_bulletin_task(date_str: str, bulletin_type: str):
         # 6. Áudio TTS (Edge TTS — Microsoft Neural, gratuito)
         logger.info("🔊 Gerando áudio...")
         bulletin_id = f"{date_str}_{bulletin_type}"
-        audio_path = await generate_audio(script, bulletin_id, TTS_VOICE)
+        audio_path = await generate_audio(script, bulletin_id, TTS_VOICE, force=force)
 
         # 7. Salva o boletim
         bulletin_data = {

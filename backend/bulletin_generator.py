@@ -144,23 +144,27 @@ Exemplo: {mandarin_word.get('example_pt')}
 {agenda_text if agenda_text else "Nenhum compromisso registrado para hoje."}
 
 INSTRUÇÕES PARA O SCRIPT:
-- Comece com uma saudação calorosa mencionando o dia da semana e data
-- Apresente cada seção de notícias com uma transição fluida
-- Para as palavras do dia, seja didático e divertido — ensine como se fosse ao vivo
+- Comece com uma saudação calorosa mencionando o dia da semana e data completa
+- Apresente cada seção de notícias com uma transição fluida (ex: "Falando agora em tecnologia...", "Nos esportes...")
+- Se a seção de notícias estiver vazia, fale sobre tendências gerais do momento ou contexto relevante
+- Para as palavras do dia, seja didático e divertido — ensine como se fosse ao vivo: diga a palavra, a pronúncia, o significado e use o exemplo em uma frase
 - Se houver agenda, mencione reuniões e tarefas importantes de forma prática
 - Termine com uma frase motivacional breve e original para o dia
-- Use APENAS texto corrido, sem markdown, sem bullets
-- Tom: profissional mas descontraído, como um podcast premium
+- Use APENAS texto corrido, sem markdown, sem bullets, sem colchetes nem títulos
+- Tom: profissional mas descontraído, como um podcast premium brasileiro
+- IMPORTANTE: O script deve ter pelo menos 600 palavras para garantir 4-5 minutos de áudio
 - Duração estimada de leitura: 5-8 minutos"""
 
     try:
         response = await client.messages.create(
             model=model,
-            max_tokens=2000,
+            max_tokens=4096,
             temperature=0.8,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.content[0].text.strip()
+        script = response.content[0].text.strip()
+        logger.info(f"Script gerado: {len(script)} caracteres / ~{len(script.split())} palavras")
+        return script
     except Exception as e:
         logger.error(f"Erro ao gerar script: {e}")
         return f"Bom dia! Hoje é {date_str}. Seu boletim está sendo preparado. Por favor, tente novamente em instantes."
@@ -207,11 +211,13 @@ NOTÍCIAS DO DIA:
     try:
         response = await client.messages.create(
             model=model,
-            max_tokens=700,
+            max_tokens=1500,
             temperature=0.8,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.content[0].text.strip()
+        script = response.content[0].text.strip()
+        logger.info(f"Resumo rápido gerado: {len(script)} caracteres / ~{len(script.split())} palavras")
+        return script
     except Exception as e:
         logger.error(f"Erro ao gerar resumo rápido: {e}")
         return "Boa tarde! Aqui está o resumo rápido do seu dia. Os destaques estão disponíveis no seu painel."
