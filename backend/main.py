@@ -233,6 +233,37 @@ async def list_bulletins():
     return bulletins
 
 
+@app.get("/api/debug/test")
+async def debug_test():
+    """Testa conexão com Anthropic API e RSS feeds."""
+    results = {"anthropic": {}, "news": {}}
+
+    # Testa Anthropic
+    try:
+        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        resp = await client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=30,
+            messages=[{"role": "user", "content": "Responda apenas: OK"}],
+        )
+        results["anthropic"] = {"status": "ok", "response": resp.content[0].text.strip()}
+    except Exception as e:
+        results["anthropic"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+    # Testa RSS
+    try:
+        news = await fetch_all_news()
+        results["news"] = {
+            "status": "ok",
+            "total": sum(len(v) for v in news.values()),
+            "per_category": {cat: len(items) for cat, items in news.items()},
+        }
+    except Exception as e:
+        results["news"] = {"status": "error", "error": str(e)}
+
+    return results
+
+
 @app.get("/api/bulletin/script/{date_str}")
 async def get_bulletin_script(date_str: str, bulletin_type: str = "morning"):
     """Retorna o script de texto do boletim para depuração."""
@@ -323,46 +354,46 @@ async def generate_bulletin_task(date_str: str, bulletin_type: str, force: bool 
         events = await get_todays_events(today)
         tasks = await get_tasks()
 
-        # 3. Palavras do dia
+        # 3. Palavras do dia (concorrente, com fallback embutido)
         logger.info("📚 Gerando palavras do dia...")
         english_word, mandarin_word = await asyncio.gather(
             get_english_word(client, ANTHROPIC_MODEL, today),
             get_mandarin_word(client, ANTHROPIC_MODEL, today),
         )
 
-        # 4. Resumos de notícias
-        logger.info("✍️  Resumindo notícias...")
+        # 4. Gera script (uma única chamada para boletim completo)
+        bulletin_id = f"{date_str}_{bulletin_type}"
         if bulletin_type == "quick":
+            logger.info("⚡ Gerando resumo rápido...")
             script = await generate_quick_summary(client, ANTHROPIC_MODEL, news_by_category, events)
             summaries = {}
         else:
-            summaries = await summarize_news(client, ANTHROPIC_MODEL, news_by_category)
-            # 5. Script completo
-            logger.info("🎙️  Gerando script do boletim...")
+            logger.info("🎙️  Gerando script completo do boletim...")
             script = await generate_bulletin_script(
                 client, ANTHROPIC_MODEL, today,
-                summaries, english_word, mandarin_word, events, tasks,
+                news_by_category, english_word, mandarin_word, events, tasks,
             )
+            summaries = {}  # script já inclui tudo, summaries separados não são necessários
 
-        # 6. Áudio TTS (Edge TTS — Microsoft Neural, gratuito)
-        logger.info("🔊 Gerando áudio...")
-        bulletin_id = f"{date_str}_{bulletin_type}"
+        # 5. Áudio TTS (Edge TTS — Microsoft Neural, gratuito)
+        logger.info(f"🔊 Gerando áudio para script de {len(script.split())} palavras...")
         audio_path = await generate_audio(script, bulletin_id, TTS_VOICE, force=force)
 
-        # 7. Salva o boletim
+        # 6. Salva o boletim
         bulletin_data = {
             "id": bulletin_id,
             "date": date_str,
             "type": bulletin_type,
             "generated_at": datetime.now().isoformat(),
             "script": script,
+            "script_word_count": len(script.split()),
             "news": news_by_category,
             "summaries": summaries,
             "english_word": english_word,
             "mandarin_word": mandarin_word,
             "events": events,
             "tasks": tasks,
-            "has_audio": True,
+            "has_audio": bool(audio_path),
         }
         save_bulletin(date_str, bulletin_type, bulletin_data)
         logger.info(f"✅ Boletim gerado com sucesso: {bulletin_id}")

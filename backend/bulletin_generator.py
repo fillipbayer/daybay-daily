@@ -1,6 +1,6 @@
 """
 DayBay Daily — Gerador de Boletim
-Usa Anthropic Claude para resumir notícias e montar o boletim completo do dia
+Usa Anthropic Claude para gerar o boletim completo do dia em UMA única chamada.
 """
 
 import json
@@ -31,131 +31,114 @@ CATEGORY_EMOJI = {
     "cultura": "🎭",
 }
 
+CATEGORY_LABELS = {
+    "brasil": "Brasil",
+    "mundo": "Mundo",
+    "tecnologia": "Tecnologia",
+    "esportes": "Esportes",
+    "entretenimento": "Entretenimento",
+    "cultura": "Cultura",
+}
 
-async def summarize_news(
-    client: anthropic.AsyncAnthropic,
-    model: str,
-    news_by_category: Dict[str, List[Dict]],
-) -> Dict[str, str]:
-    """
-    Gera um resumo narrativo para cada categoria de notícias.
-    Retorna {categoria: texto_resumo}
-    """
-    summaries = {}
 
+def _build_news_text(news_by_category: Dict[str, List[Dict]], max_per_cat: int = 5) -> str:
+    """Constrói texto de headlines para o prompt."""
+    lines = []
     for category, items in news_by_category.items():
         if not items:
             continue
-
-        headlines = "\n".join([
-            f"- {item['title']} ({item['source']})"
-            for item in items[:6]
-        ])
-
-        emoji = CATEGORY_EMOJI.get(category, "📌")
-        prompt = f"""Você é um apresentador de rádio brasileiro, descontraído e informativo.
-
-Abaixo estão os principais títulos de notícias de {category.upper()} de hoje:
-{headlines}
-
-Escreva um breve resumo falado (2-3 parágrafos, máx 200 palavras) sobre estas notícias como se estivesse apresentando ao vivo um boletim matinal de rádio.
-- Use linguagem natural e fluente, como se estivesse falando
-- Destaque os pontos mais relevantes
-- Seja objetivo mas envolvente
-- NÃO use bullets, markdown ou formatação especial — apenas texto corrido
-- Comece diretamente com o conteúdo (sem "Olá" nem saudações)"""
-
-        try:
-            response = await client.messages.create(
-                model=model,
-                max_tokens=350,
-                temperature=0.75,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            summaries[category] = response.content[0].text.strip()
-        except Exception as e:
-            logger.error(f"Erro ao resumir {category}: {e}")
-            titles = [item["title"] for item in items[:3]]
-            summaries[category] = f"Destaques de hoje: {' | '.join(titles)}"
-
-    return summaries
+        label = CATEGORY_LABELS.get(category, category).upper()
+        lines.append(f"\n[{label}]")
+        for item in items[:max_per_cat]:
+            source = item.get("source", "")
+            summary = item.get("summary", "").strip()
+            line = f"• {item['title']}"
+            if source:
+                line += f" ({source})"
+            if summary and len(summary) > 20:
+                line += f"\n  {summary[:200]}"
+            lines.append(line)
+    return "\n".join(lines) if lines else "Nenhuma notícia disponível no momento."
 
 
 async def generate_bulletin_script(
     client: anthropic.AsyncAnthropic,
     model: str,
     today: date,
-    category_summaries: Dict[str, str],
+    news_by_category: Dict[str, List[Dict]],
     english_word: Dict,
     mandarin_word: Dict,
     events: List[Dict],
     tasks: List[Dict],
 ) -> str:
     """
-    Gera o script completo do boletim para leitura em áudio.
+    Gera o script completo do boletim em UMA única chamada ao Claude.
+    Inclui resumo das notícias, palavras do dia e agenda — tudo em texto corrido para TTS.
     """
     weekday = WEEKDAYS_PT[today.weekday()]
     date_str = f"{weekday}, {today.day:02d} de {MONTHS_PT[today.month]} de {today.year}"
 
-    # Monta contexto de agenda
+    news_text = _build_news_text(news_by_category)
+
+    # Agenda
     agenda_text = ""
     if events:
-        agenda_text = "Sua agenda de hoje:\n"
+        agenda_text = "Agenda de hoje:\n"
         for ev in events[:5]:
             agenda_text += f"- {ev['start'][:5]}: {ev['subject']}"
             if ev.get("location"):
                 agenda_text += f" ({ev['location']})"
             agenda_text += "\n"
     if tasks:
-        agenda_text += "\nSuas tarefas pendentes:\n"
         high = [t for t in tasks if t.get("importance") == "high"]
-        for t in (high or tasks)[:4]:
-            due = f" — vence {t['due_date']}" if t.get("due_date") else ""
-            agenda_text += f"- {t['title']}{due}\n"
+        pendentes = (high or tasks)[:3]
+        if pendentes:
+            agenda_text += "Tarefas pendentes:\n"
+            for t in pendentes:
+                due = f" — vence {t['due_date']}" if t.get("due_date") else ""
+                agenda_text += f"- {t['title']}{due}\n"
 
-    # Monta resumos de notícias
-    news_text = ""
-    for category, summary in category_summaries.items():
-        label = {"brasil": "Brasil", "mundo": "Mundo", "tecnologia": "Tecnologia",
-                 "esportes": "Esportes", "entretenimento": "Entretenimento", "cultura": "Cultura"}.get(category, category)
-        news_text += f"\n[{label.upper()}]\n{summary}\n"
-
-    prompt = f"""Você é um apresentador de rádio brasileiro carismático e informativo chamado "Day".
+    prompt = f"""Você é "Day", apresentador de um boletim matinal de rádio brasileiro — carismático, informativo e descontraído.
 
 Hoje é {date_str}.
 
-Use os conteúdos abaixo para montar o SCRIPT COMPLETO do boletim matinal para ser lido em áudio (TTS).
+Crie o SCRIPT COMPLETO do boletim para ser convertido em áudio (TTS). O script deve ter pelo menos 700 palavras e cobrir todos os blocos abaixo em texto corrido, natural e fluente — como se estivesse falando ao vivo.
 
-=== NOTÍCIAS ===
+=== NOTÍCIAS DE HOJE ===
 {news_text}
 
-=== PALAVRA DO DIA — INGLÊS AVANÇADO ===
-Palavra: {english_word.get('word')} ({english_word.get('type')})
-Pronúncia: {english_word.get('phonetic')}
-Significado: {english_word.get('definition_pt')}
-Exemplo: {english_word.get('example_pt')}
+=== PALAVRA DO DIA — INGLÊS (nível avançado) ===
+Palavra: {english_word.get('word', 'Perspicacious')} ({english_word.get('type', 'adjetivo')})
+Pronúncia: {english_word.get('phonetic', 'pər-spɪ-ˈkeɪ-shəs')}
+Significado em português: {english_word.get('definition_pt', 'perspicaz, de percepção aguçada')}
+Exemplo: {english_word.get('example_pt', 'Sua análise perspicaz impressionou todos.')}
 
-=== PALAVRA DO DIA — MANDARIM ===
-Palavra: {mandarin_word.get('word')} — {mandarin_word.get('pinyin')}
-Significado: {mandarin_word.get('definition_pt')}
-Exemplo: {mandarin_word.get('example_pt')}
+=== PALAVRA DO DIA — MANDARIM (nível básico) ===
+Caractere: {mandarin_word.get('word', '你好')} — Pinyin: {mandarin_word.get('pinyin', 'nǐ hǎo')}
+Significado: {mandarin_word.get('definition_pt', 'Olá')}
+Exemplo: {mandarin_word.get('example_pt', 'Você diz nǐ hǎo para cumprimentar alguém.')}
 
 === AGENDA ===
 {agenda_text if agenda_text else "Nenhum compromisso registrado para hoje."}
 
-INSTRUÇÕES PARA O SCRIPT:
-- Comece com uma saudação calorosa mencionando o dia da semana e data completa
-- Apresente cada seção de notícias com uma transição fluida (ex: "Falando agora em tecnologia...", "Nos esportes...")
-- Se a seção de notícias estiver vazia, fale sobre tendências gerais do momento ou contexto relevante
-- Para as palavras do dia, seja didático e divertido — ensine como se fosse ao vivo: diga a palavra, a pronúncia, o significado e use o exemplo em uma frase
-- Se houver agenda, mencione reuniões e tarefas importantes de forma prática
-- Termine com uma frase motivacional breve e original para o dia
-- Use APENAS texto corrido, sem markdown, sem bullets, sem colchetes nem títulos
+ESTRUTURA DO SCRIPT (siga esta ordem):
+1. Abertura calorosa com saudação, dia da semana e data completa (2-3 frases)
+2. Bloco de notícias — para cada categoria com notícias, apresente os destaques de forma narrativa e envolvente (não liste — conte como uma história). Se houver poucas notícias, aprofunde o contexto.
+3. Bloco "Palavra do Dia em Inglês" — apresente a palavra, diga como se pronuncia, explique o significado e use o exemplo naturalmente
+4. Bloco "Palavra do Dia em Mandarim" — mesmo formato, com dica cultural
+5. Bloco de agenda — mencione compromissos e tarefas de forma prática
+6. Encerramento motivacional original (2-3 frases)
+
+REGRAS OBRIGATÓRIAS:
+- Use APENAS texto corrido — zero markdown, zero bullets, zero colchetes, zero títulos com asteriscos
 - Tom: profissional mas descontraído, como um podcast premium brasileiro
-- IMPORTANTE: O script deve ter pelo menos 600 palavras para garantir 4-5 minutos de áudio
-- Duração estimada de leitura: 5-8 minutos"""
+- Mínimo de 700 palavras — o ouvinte precisa de pelo menos 5 minutos de conteúdo
+- Transições naturais entre blocos (ex: "Falando agora de tecnologia...", "E por falar em esportes...")
+- Escreva exatamente como seria falado em voz alta — sem abreviações estranhas
+- Pronuncie números por extenso quando possível (ex: "dois mil e vinte e seis" em vez de "2026")"""
 
     try:
+        logger.info(f"Chamando Claude ({model}) para gerar script do boletim...")
         response = await client.messages.create(
             model=model,
             max_tokens=4096,
@@ -163,11 +146,74 @@ INSTRUÇÕES PARA O SCRIPT:
             messages=[{"role": "user", "content": prompt}],
         )
         script = response.content[0].text.strip()
-        logger.info(f"Script gerado: {len(script)} caracteres / ~{len(script.split())} palavras")
+        word_count = len(script.split())
+        char_count = len(script)
+        logger.info(f"✅ Script gerado: {word_count} palavras / {char_count} caracteres / ~{word_count//150} min de áudio")
         return script
     except Exception as e:
-        logger.error(f"Erro ao gerar script: {e}")
-        return f"Bom dia! Hoje é {date_str}. Seu boletim está sendo preparado. Por favor, tente novamente em instantes."
+        logger.error(f"❌ Erro ao gerar script com Claude: {type(e).__name__}: {e}")
+        # Fallback: script básico baseado nas notícias sem IA
+        return _generate_fallback_script(date_str, news_by_category, english_word, mandarin_word, agenda_text)
+
+
+def _generate_fallback_script(
+    date_str: str,
+    news_by_category: Dict[str, List[Dict]],
+    english_word: Dict,
+    mandarin_word: Dict,
+    agenda_text: str,
+) -> str:
+    """Gera um script básico sem IA quando a API falha."""
+    lines = [
+        f"Bom dia! Hoje é {date_str}. Eu sou Day, e este é o seu boletim diário.",
+        "",
+    ]
+
+    for category, items in news_by_category.items():
+        if not items:
+            continue
+        label = CATEGORY_LABELS.get(category, category)
+        lines.append(f"Nos destaques de {label}:")
+        for item in items[:3]:
+            lines.append(f"{item['title']}.")
+        lines.append("")
+
+    word = english_word.get('word', '')
+    if word:
+        lines.append(
+            f"A palavra do dia em inglês é {word}, que significa {english_word.get('definition_pt', '')}. "
+            f"Exemplo: {english_word.get('example_pt', '')}."
+        )
+
+    mword = mandarin_word.get('word', '')
+    if mword:
+        lines.append(
+            f"Em mandarim, aprenda {mword}, pronunciado {mandarin_word.get('pinyin', '')}, "
+            f"que significa {mandarin_word.get('definition_pt', '')}."
+        )
+
+    if agenda_text:
+        lines.append(f"\nSua agenda: {agenda_text}")
+
+    lines.append("\nTenha um excelente dia! Até amanhã.")
+    return "\n".join(lines)
+
+
+async def summarize_news(
+    client: anthropic.AsyncAnthropic,
+    model: str,
+    news_by_category: Dict[str, List[Dict]],
+) -> Dict[str, str]:
+    """
+    Compatibilidade: retorna resumos simples das headlines (sem chamada de API).
+    A geração real do script agora é feita em generate_bulletin_script diretamente.
+    """
+    summaries = {}
+    for category, items in news_by_category.items():
+        if items:
+            titles = [item["title"] for item in items[:5]]
+            summaries[category] = " | ".join(titles)
+    return summaries
 
 
 async def generate_quick_summary(
@@ -177,38 +223,39 @@ async def generate_quick_summary(
     events: List[Dict],
 ) -> str:
     """
-    Gera um resumo rápido para o boletim on-demand (ex: às 18h).
-    Mais curto e focado nos destaques do dia.
+    Gera um resumo rápido e dinâmico dos destaques do dia.
     """
     all_headlines = []
     for category, items in news_by_category.items():
-        label = category.upper()
-        for item in items[:2]:
+        label = CATEGORY_LABELS.get(category, category)
+        for item in items[:3]:
             all_headlines.append(f"[{label}] {item['title']}")
 
-    headlines_text = "\n".join(all_headlines[:20])
+    headlines_text = "\n".join(all_headlines[:20]) if all_headlines else "Sem destaques disponíveis no momento."
 
     agenda_reminder = ""
     if events:
         pending = [e for e in events if e["start"] > datetime.now().strftime("%Y-%m-%d %H:%M")]
         if pending:
-            agenda_reminder = f"\n\nReunião pendente hoje: {pending[0]['subject']} às {pending[0]['start'][:5]}"
+            agenda_reminder = f"\n\nAinda hoje: {pending[0]['subject']} às {pending[0]['start'][:5]}"
 
-    prompt = f"""Você é Day, apresentador de um boletim de rádio.
+    prompt = f"""Você é Day, apresentador de um boletim de rádio brasileiro.
 
-É final de tarde. Faça um resumo rápido e dinâmico dos destaques do dia (máx 400 palavras, texto corrido para TTS):
+É final de tarde. Faça um resumo rápido e dinâmico dos destaques do dia com pelo menos 300 palavras em texto corrido, para ser lido em áudio:
 
-NOTÍCIAS DO DIA:
+DESTAQUES DE HOJE:
 {headlines_text}
 {agenda_reminder}
 
+REGRAS:
 - Comece com "Boa tarde! Aqui estão os destaques de hoje..."
-- Cubra as principais notícias de forma ágil
-- Mencione a agenda se houver
+- Apresente as notícias de forma ágil e envolvente — conte, não liste
 - Termine com "Até amanhã!" ou similar
-- Apenas texto corrido, sem markdown"""
+- Mínimo de 300 palavras
+- Apenas texto corrido, sem markdown, sem bullets"""
 
     try:
+        logger.info(f"Chamando Claude ({model}) para resumo rápido...")
         response = await client.messages.create(
             model=model,
             max_tokens=1500,
@@ -216,8 +263,14 @@ NOTÍCIAS DO DIA:
             messages=[{"role": "user", "content": prompt}],
         )
         script = response.content[0].text.strip()
-        logger.info(f"Resumo rápido gerado: {len(script)} caracteres / ~{len(script.split())} palavras")
+        logger.info(f"✅ Resumo rápido: {len(script.split())} palavras")
         return script
     except Exception as e:
-        logger.error(f"Erro ao gerar resumo rápido: {e}")
-        return "Boa tarde! Aqui está o resumo rápido do seu dia. Os destaques estão disponíveis no seu painel."
+        logger.error(f"❌ Erro ao gerar resumo rápido: {type(e).__name__}: {e}")
+        # Fallback sem IA
+        lines = ["Boa tarde! Aqui estão os destaques de hoje."]
+        for category, items in news_by_category.items():
+            for item in items[:2]:
+                lines.append(f"{item['title']}.")
+        lines.append("Fique bem e até amanhã!")
+        return " ".join(lines)
